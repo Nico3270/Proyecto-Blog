@@ -1,3 +1,4 @@
+from turtle import title
 from flask import Flask, render_template, redirect, url_for
 from flask_bootstrap import Bootstrap
 from flask_sqlalchemy import SQLAlchemy
@@ -5,6 +6,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField
 from wtforms.validators import DataRequired, URL
 from flask_ckeditor import CKEditor, CKEditorField
+from datetime import date
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '8BYkEfBA6O6donzWlSihBXox7C0sKR6b'
@@ -33,7 +35,7 @@ class CreatePostForm(FlaskForm):
     subtitle = StringField("Subtitle", validators=[DataRequired()])
     author = StringField("Your Name", validators=[DataRequired()])
     img_url = StringField("Blog Image URL", validators=[DataRequired(), URL()])
-    body = StringField("Blog Content", validators=[DataRequired()])
+    body = CKEditorField("Blog Content", validators=[DataRequired()])
     submit = SubmitField("Submit Post")
 
 
@@ -62,9 +64,44 @@ def about():
 def contact():
     return render_template("contact.html")
 
-@app.route("/new-post")
+@app.route("/new-post", methods=["GET","POST"])
 def New_post():
-    return render_template('make-post.html')
+    form = CreatePostForm()
+    if form.validate_on_submit():
+        new_post = BlogPost(
+            title=form.title.data,
+            subtitle=form.subtitle.data,
+            body=form.body.data,
+            img_url=form.img_url.data,
+            author=form.author.data,
+            date=date.today().strftime("%B %d, %Y")
+        )
+        db.session.add(new_post)
+        db.session.commit()
+        return redirect(url_for("get_all_posts"))
+    return render_template("make-post.html", form=form, title_post="Nuevo Post")
+
+@app.route("/edit-post/<post_id>", methods=["GET","POST"])
+def edit(post_id):
+    form = CreatePostForm()
+    if form.validate_on_submit():
+        edit_post = BlogPost.query.get(post_id)
+        edit_post.title = form.title.data
+        edit_post.subtitle = form.subtitle.data
+        edit_post.body = form.body.data
+        edit_post.img_url = form.img_url.data
+        edit_post.author =form.author.data
+        edit_post.date = date.today().strftime("%B %d, %Y")
+        db.session.commit()
+        return redirect(url_for("get_all_posts"))
+    return render_template("make-post.html", form=form, title_post="Editar Post")
+
+@app.route("/delete/<post_id>", methods =["GET","POST"])
+def delete(post_id):
+    post_to_delete = BlogPost.query.get(post_id)
+    db.session.delete(post_to_delete)
+    db.session.commit()
+    return render_template("index.html")
 
 if __name__ == "__main__":
     app.run(debug = True)
